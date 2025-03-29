@@ -18,7 +18,7 @@ app.use(express.json());
 const upload = multer({ dest: "uploads/" }); // Carpeta temporal para los archivos
 
 // Cargar las credenciales de Google API
-const keyPath = path.join(__dirname, 'credenciales.json'); // Asegúrate de que la ruta sea correcta
+const keyPath = path.join(__dirname, 'apidrive.json'); // Asegúrate de que la ruta sea correcta
 const keyFile = require(keyPath);
 
 // Configuración de Google Drive API
