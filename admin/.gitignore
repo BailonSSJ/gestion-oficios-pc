@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+backend/credenciales.json
+backend/apidrive.json
+backend/google-drive.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
