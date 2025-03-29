@@ -18,7 +18,7 @@ app.use(express.json());
 const upload = multer({ dest: "uploads/" }); // Carpeta temporal para los archivos
 
 // Cargar las credenciales de Google API
-const keyPath = path.join(__dirname, 'google-drive.json');
+const keyPath = path.join(__dirname, 'credenciales.json'); // Asegúrate de que la ruta sea correcta
 const keyFile = require(keyPath);
 
 // Configuración de Google Drive API
@@ -33,25 +33,37 @@ const drive = google.drive({ version: "v3", auth });
 const uploadFileToDrive = async (filePath, fileName) => {
   const fileMetadata = {
     name: fileName,
-    parents: ['root'],  // Cambia esto si quieres subirlo a una carpeta específica en Drive
+    parents: ["1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl"], // ID de tu carpeta en Drive
   };
+
   const media = {
     mimeType: "application/pdf",
-    body: fs.createReadStream(filePath)
+    body: fs.createReadStream(filePath),
   };
 
   try {
     const file = await drive.files.create({
       resource: fileMetadata,
       media: media,
-      fields: "id, webViewLink"
+      fields: "id, webViewLink",
     });
+
+    // Hacer público el archivo
+    await drive.permissions.create({
+      fileId: file.data.id,
+      requestBody: {
+        role: "reader",
+        type: "anyone",
+      },
+    });
+
     return file.data;
   } catch (error) {
     console.error("Error al subir el archivo a Google Drive", error);
     throw error;
   }
 };
+
 // Ruta para manejar la subida de archivos PDF
 app.post("/upload", upload.single("pdf"), async (req, res) => {
   try {
