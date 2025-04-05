@@ -1,101 +1,98 @@
-// Importaciones necesarias
-const express = require("express");
-const { google } = require("googleapis");
-const path = require("path");
-const fs = require("fs");
-const cors = require("cors");
-const multer = require("multer");
+const express = require('express');
+const cors = require('cors');
+const fileUpload = require('express-fileupload');
+const fs = require('fs');
+const path = require('path');
+const { google } = require('googleapis');
+const mime = require('mime-types');
 
-// Configurar Express
 const app = express();
-const port = 5000;
+const PORT = 5000;
 
-// Middleware
-app.use(cors());
+// 🔹 Habilitar CORS para permitir peticiones desde el frontend
+app.use(cors({
+    origin: 'http://localhost:5173', // Permitir solicitudes solo desde el frontend
+    methods: ['POST'],
+    allowedHeaders: ['Content-Type']
+}));
+
+// Configurar middleware para subir archivos
 app.use(express.json());
+app.use(fileUpload({ useTempFiles: true, tempFileDir: "/tmp/" }));
 
-// Configurar Multer para manejar la subida de archivos
-const upload = multer({ dest: "uploads/" }); // Carpeta temporal para los archivos
+// Crear la carpeta 'uploads' si no existe
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
 
-// Cargar las credenciales de Google API
-const keyPath = path.join(__dirname, 'credenciales.json'); // Asegúrate de que la ruta sea correcta
-const keyFile = require(keyPath);
-
-// Configuración de Google Drive API
+// 🔹 Configurar autenticación con Google Drive
 const auth = new google.auth.GoogleAuth({
-  credentials: keyFile,
-  scopes: ["https://www.googleapis.com/auth/drive.file"]
+    keyFile: "gestion.json",  // Asegúrate de que este archivo exista
+    scopes: ["https://www.googleapis.com/auth/drive.file"],
 });
-
 const drive = google.drive({ version: "v3", auth });
 
-// Función para subir un archivo a Google Drive
-const uploadFileToDrive = async (filePath, fileName) => {
-  const fileMetadata = {
-    name: fileName,
-    parents: ["1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl"], // ID de tu carpeta en Drive
-  };
+// 🔹 ID de la carpeta en Google Drive donde se guardarán los archivos
+const DRIVE_FOLDER_ID = "1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl"; // Reemplázalo con tu Folder ID de Google Drive
 
-  const media = {
-    mimeType: "application/pdf",
-    body: fs.createReadStream(filePath),
-  };
+// 🔹 Función para subir archivos a Google Drive
+async function uploadToGoogleDrive(filePath, fileName) {
+    try {
+        const fileMetadata = {
+            name: fileName,
+            parents: [DRIVE_FOLDER_ID], // Guardar en la carpeta específica
+        };
+        const media = {
+            mimeType: mime.lookup(filePath),
+            body: fs.createReadStream(filePath),
+        };
 
-  try {
-    const file = await drive.files.create({
-      resource: fileMetadata,
-      media: media,
-      fields: "id, webViewLink",
-    });
+        const response = await drive.files.create({
+            resource: fileMetadata,
+            media: media,
+            fields: "id",
+        });
 
-    // Hacer público el archivo
-    await drive.permissions.create({
-      fileId: file.data.id,
-      requestBody: {
-        role: "reader",
-        type: "anyone",
-      },
-    });
-
-    return file.data;
-  } catch (error) {
-    console.error("Error al subir el archivo a Google Drive", error);
-    throw error;
-  }
-};
-
-// Ruta para manejar la subida de archivos PDF
-app.post("/upload", upload.single("pdf"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: "No se ha subido ningún archivo" });
+        console.log(`📂 Archivo subido a Drive con ID: ${response.data.id}`);
+        return response.data.id;
+    } catch (error) {
+        console.error("❌ Error al subir el archivo a Google Drive:", error);
+        throw new Error("Error al subir el archivo a Google Drive.");
     }
+}
 
-    const filePath = path.join(__dirname, req.file.path);
-    const fileName = req.file.originalname;
+// 🔹 Ruta para recibir y subir archivos
+app.post('/upload', async (req, res) => {
+    try {
+        if (!req.files || !req.files.pdf) {
+            return res.status(400).json({ success: false, message: "No se recibió ningún archivo." });
+        }
 
-    const fileData = await uploadFileToDrive(filePath, fileName);
+        const archivo = req.files.pdf;
+        console.log("📂 Archivo recibido:", archivo.name);
 
-    // Eliminar archivo temporal después de subirlo
-    fs.unlinkSync(filePath);
+        const uploadPath = path.join(uploadDir, archivo.name);
+        await archivo.mv(uploadPath);
+        console.log("✅ Archivo guardado en:", uploadPath);
 
-    res.json({
-      success: true,
-      message: "Archivo subido correctamente",
-      fileId: fileData.id,
-      fileLink: fileData.webViewLink,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Error al subir el archivo" });
-  }
+        // 🔹 Subir archivo a Google Drive
+        const fileId = await uploadToGoogleDrive(uploadPath, archivo.name);
+
+        // 🔹 Enviar respuesta con el enlace al archivo en Google Drive
+        res.json({
+            success: true,
+            message: "Archivo subido correctamente.",
+            fileId: fileId,
+            driveUrl: `https://drive.google.com/file/d/${fileId}/view`,
+        });
+
+    } catch (error) {
+        console.error("❌ Error en la subida del archivo:", error);
+        res.status(500).json({ success: false, message: "Error en el servidor." });
+    }
 });
 
-// Ruta raíz, para verificar que el servidor está funcionando
-app.get("/", (req, res) => {
-  res.send("Servidor de Backend en funcionamiento");
-});
-
-// Iniciar servidor
-app.listen(port, () => {
-  console.log(`Servidor ejecutándose en http://localhost:${port}`);
+app.listen(PORT, () => {
+    console.log(`🚀 Servidor ejecutándose en http://localhost:${PORT}`);
 });

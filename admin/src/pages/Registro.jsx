@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import '../styles/Registro.css';
 
@@ -10,17 +10,28 @@ const Registro = () => {
   const [persona, setPersona] = useState('');
   const [pdf, setPdf] = useState(null);
   const [mensaje, setMensaje] = useState('');
+  const fileInputRef = useRef(null); // Para resetear el input de archivos
 
   const handleFileChange = (e) => {
-    setPdf(e.target.files[0]);
+    const file = e.target.files[0];
+
+    if (file && file.type !== "application/pdf") {
+      setMensaje("❌ Solo se permiten archivos en formato PDF.");
+      setPdf(null);
+      e.target.value = ""; // Reiniciar el input
+      return;
+    }
+
+    setPdf(file);
+    setMensaje(""); // Limpiar mensaje de error si el archivo es válido
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!pdf) {
-      setMensaje("Por favor, selecciona un archivo PDF.");
-      return;
+        setMensaje("❌ Por favor, selecciona un archivo PDF.");
+        return;
     }
 
     const formData = new FormData();
@@ -32,26 +43,27 @@ const Registro = () => {
     formData.append('persona', persona);
 
     try {
-      const response = await axios.post('http://localhost:5000/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+        const response = await axios.post('http://localhost:5000/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
 
-      if (response.data.success) {
-        setMensaje("Archivo subido correctamente.");
-      } else {
-        setMensaje("Error: " + response.data.message);
-      }
+        if (response.data.success) {
+            setMensaje(`✅ Archivo subido correctamente. 📂\n🔗 Enlace: ${response.data.driveUrl}`);
+        } else {
+            setMensaje("❌ Error: " + response.data.message);
+        }
 
-      // Limpiar los campos después de enviar
-      setFolio('');
-      setAsunto('');
-      setFechaRecibo('');
-      setContenido('');
-      setPersona('');
-      setPdf(null);
+        // Limpiar formulario después de la subida
+        setFolio('');
+        setAsunto('');
+        setFechaRecibo('');
+        setContenido('');
+        setPersona('');
+        setPdf(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (error) {
-      setMensaje("Error al subir el archivo.");
-      console.error(error);
+        setMensaje("❌ Error al subir el archivo.");
+        console.error("Error en la subida:", error);
     }
   };
 
@@ -81,7 +93,14 @@ const Registro = () => {
         </div>
         <div>
           <label>Oficio (PDF):</label>
-          <input type="file" accept=".pdf" onChange={handleFileChange} required />
+          <input 
+            type="file" 
+            name="pdf"  
+            accept=".pdf" 
+            onChange={handleFileChange} 
+            ref={fileInputRef} 
+            required 
+          />
         </div>
         <button type="submit">Enviar</button>
       </form>
