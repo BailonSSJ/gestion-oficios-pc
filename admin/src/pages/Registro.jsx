@@ -43,9 +43,10 @@ const Registro = () => {
     formData.append('persona', persona);
 
     try {
-        const response = await axios.post('http://localhost:5000/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        });
+      const response = await axios.post('http://localhost:3001/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      
 
         if (response.data.success) {
             setMensaje(`✅ Archivo subido correctamente. 📂\n🔗 Enlace: ${response.data.driveUrl}`);
