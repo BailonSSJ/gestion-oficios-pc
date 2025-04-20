@@ -11,7 +11,10 @@ node_modules
 dist
 dist-ssr
 *.local
-gestion.json
+
+backend/credenciales.json
+backend/apidrive.json
+backend/google-drive.json
 
 # Editor directories and files
 .vscode/*

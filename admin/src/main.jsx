@@ -1,10 +1,11 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import Registro from './pages/Registro.jsx'; // Importar el formulario
-import './index.css';
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+import './index.css' // si usas estilos globales
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Registro />
-  </React.StrictMode>,
-);
+    <App />
+  </React.StrictMode>
+)
+
