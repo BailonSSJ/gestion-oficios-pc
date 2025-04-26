@@ -1,114 +1,101 @@
-import express from 'express';
-import multer from 'multer';
-import fs from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
-import { google } from 'googleapis';
-import mime from 'mime-types';
-import cors from 'cors';
-import { initializeApp, cert } from 'firebase-admin/app';
-import { getDatabase } from 'firebase-admin/database';
+// Importaciones necesarias
+const express = require("express");
+const { google } = require("googleapis");
+const path = require("path");
+const fs = require("fs");
+const cors = require("cors");
+const multer = require("multer");
 
-dotenv.config();
-
+// Configurar Express
 const app = express();
-const upload = multer({ dest: 'uploads/' });
+const port = 5000;
 
-app.use(cors({
-  origin: 'http://localhost:5173',
-  methods: ['POST'],
-  allowedHeaders: ['Content-Type']
-}));
+// Middleware
+app.use(cors());
 app.use(express.json());
 
-const DRIVE_FOLDER_ID = "1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl"; // Reemplaza por tu carpeta de Drive
+// Configurar Multer para manejar la subida de archivos
+const upload = multer({ dest: "uploads/" }); // Carpeta temporal para los archivos
 
-// 🗂️ Ruta del archivo de credenciales desde .env
-const serviceAccountPath = process.env.FIREBASE_CREDENTIALS_PATH;
+// Cargar las credenciales de Google API
+const keyPath = path.join(__dirname, 'gestion.json'); // Asegúrate de que la ruta sea correcta
+const keyFile = require(keyPath);
 
-if (!serviceAccountPath) {
-  console.error('❌ No se ha definido FIREBASE_CREDENTIALS_PATH en el archivo .env');
-  process.exit(1);
-}
-
-// 🔐 Autenticación con Google Drive
+// Configuración de Google Drive API
 const auth = new google.auth.GoogleAuth({
-  credentials: JSON.parse(fs.readFileSync(serviceAccountPath, 'utf-8')),
-  scopes: ['https://www.googleapis.com/auth/drive.file'],
+  credentials: keyFile,
+  scopes: ["https://www.googleapis.com/auth/drive.file"]
 });
 
-const drive = google.drive({ version: 'v3', auth });
+const drive = google.drive({ version: "v3", auth });
 
-// 🔥 Inicializar Firebase Admin SDK
-initializeApp({
-  credential: cert(JSON.parse(fs.readFileSync(serviceAccountPath, 'utf-8'))),
-  databaseURL: 'https://gestion-oficios-pc-default-rtdb.firebaseio.com',
-});
+// Función para subir un archivo a Google Drive
+const uploadFileToDrive = async (filePath, fileName) => {
+  const fileMetadata = {
+    name: fileName,
+    parents: ["1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl"], // ID de tu carpeta en Drive
+  };
 
-const db = getDatabase();
-
-// 🚀 Ruta para subir archivo y guardar metadatos
-app.post('/upload', upload.single('pdf'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, message: 'No se ha enviado ningún archivo.' });
-  }
+  const media = {
+    mimeType: "application/pdf",
+    body: fs.createReadStream(filePath),
+  };
 
   try {
-    const filePath = req.file.path;
-    const originalName = req.file.originalname;
-    const mimeType = mime.lookup(filePath) || 'application/pdf';
-
-    const fileMetadata = {
-      name: originalName,
-      parents: [DRIVE_FOLDER_ID],
-    };
-
-    const media = {
-      mimeType,
-      body: fs.createReadStream(filePath),
-    };
-
-    const response = await drive.files.create({
+    const file = await drive.files.create({
       resource: fileMetadata,
       media: media,
-      fields: 'id',
+      fields: "id, webViewLink",
     });
 
-    fs.unlinkSync(filePath); // Borrar archivo temporal
-
-    const fileId = response.data.id;
-    const fileUrl = `https://drive.google.com/file/d/${fileId}/view`;
-
-    const { folio, asunto, fechaRecibo, contenido, persona } = req.body;
-
-    console.log("📝 Metadatos recibidos:", { folio, asunto, fechaRecibo, contenido, persona });
-
-    // Guardar en Firebase Realtime Database
-    await db.ref(`oficios/${folio}`).set({
-      folio,
-      asunto,
-      fechaRecibo,
-      contenido,
-      persona,
-      pdfUrl: fileUrl,
-      estatus: "En revisión",
-      comentarios: "",
-      fechaActualizacion: new Date().toISOString(),
+    // Hacer público el archivo
+    await drive.permissions.create({
+      fileId: file.data.id,
+      requestBody: {
+        role: "reader",
+        type: "anyone",
+      },
     });
+
+    return file.data;
+  } catch (error) {
+    console.error("Error al subir el archivo a Google Drive", error);
+    throw error;
+  }
+};
+
+// Ruta para manejar la subida de archivos PDF
+app.post("/upload", upload.single("pdf"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No se ha subido ningún archivo" });
+    }
+
+    const filePath = path.join(__dirname, req.file.path);
+    const fileName = req.file.originalname;
+
+    const fileData = await uploadFileToDrive(filePath, fileName);
+
+    // Eliminar archivo temporal después de subirlo
+    fs.unlinkSync(filePath);
 
     res.json({
       success: true,
-      driveUrl: fileUrl,
-      fileId,
+      message: "Archivo subido correctamente",
+      fileId: fileData.id,
+      fileLink: fileData.webViewLink,
     });
   } catch (error) {
-    console.error('❌ Error al subir el archivo o guardar en Firebase:', error);
-    res.status(500).json({ success: false, message: 'Error al subir el archivo o guardar los datos.' });
+    res.status(500).json({ success: false, message: "Error al subir el archivo" });
   }
 });
 
+// Ruta raíz, para verificar que el servidor está funcionando
+app.get("/", (req, res) => {
+  res.send("Servidor de Backend en funcionamiento");
+});
+
 // Iniciar servidor
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor backend corriendo en http://localhost:${PORT}`);
+app.listen(port, () => {
+  console.log(`Servidor ejecutándose en http://localhost:${port}`);
 });

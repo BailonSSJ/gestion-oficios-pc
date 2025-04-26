@@ -1,9 +1,18 @@
-import { Routes, Route } from 'react-router-dom'; // Importa Routes y Route
-import Registro from './pages/Registro'; // La página del formulario
+// App.jsx o Main.jsx
 import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Formulario from './pages/Registro';
+import OficiosPanel from './components/OficiosPanel';
 
-const App = () => {
-  return <h1>¡Hola! La aplicación está funcionando 🎉</h1>;
-};
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Formulario />} />
+        <Route path="/panel" element={<OficiosPanel />} />
+      </Routes>
+    </Router>
+  );
+}
 
 export default App;
