@@ -1,12 +1,18 @@
-// Importaciones necesarias
-const express = require("express");
-const { google } = require("googleapis");
-const path = require("path");
-const fs = require("fs");
-const cors = require("cors");
-const multer = require("multer");
+// Importaciones necesarias (formato ESM)
+import express from "express";
+import { google } from "googleapis";
+import path from "path";
+import fs from "fs";
+import cors from "cors";
+import multer from "multer";
+import { fileURLToPath } from "url";
+import admin from "firebase-admin"; // 👈 Firebase Admin SDK
 
-// Configurar Express
+// Compatibilidad para __dirname en ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Inicializar Express
 const app = express();
 const port = 5000;
 
@@ -14,88 +20,101 @@ const port = 5000;
 app.use(cors());
 app.use(express.json());
 
-// Configurar Multer para manejar la subida de archivos
-const upload = multer({ dest: "uploads/" }); // Carpeta temporal para los archivos
+// Configurar Multer
+const upload = multer({ dest: "uploads/" });
 
-// Cargar las credenciales de Google API
-const keyPath = path.join(__dirname, 'gestion.json'); // Asegúrate de que la ruta sea correcta
-const keyFile = require(keyPath);
+// Cargar credenciales de Google Drive
+const keyFile = JSON.parse(fs.readFileSync(path.join(__dirname, "gestion.json"), "utf-8"));
 
-// Configuración de Google Drive API
+// Autenticación Google Drive
 const auth = new google.auth.GoogleAuth({
   credentials: keyFile,
   scopes: ["https://www.googleapis.com/auth/drive.file"]
 });
-
 const drive = google.drive({ version: "v3", auth });
 
-// Función para subir un archivo a Google Drive
+// Inicializar Firebase Admin
+const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, "firebase-service-account.json"), "utf-8"));
+admin.initializeApp({
+  credential: admin.credential.cert(firebaseConfig)
+});
+const db = admin.firestore();
+
+// Subida a Google Drive
 const uploadFileToDrive = async (filePath, fileName) => {
   const fileMetadata = {
     name: fileName,
-    parents: ["1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl"], // ID de tu carpeta en Drive
+    parents: ["1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl"], // carpeta en tu Drive
   };
-
   const media = {
     mimeType: "application/pdf",
     body: fs.createReadStream(filePath),
   };
 
-  try {
-    const file = await drive.files.create({
-      resource: fileMetadata,
-      media: media,
-      fields: "id, webViewLink",
-    });
+  const file = await drive.files.create({
+    resource: fileMetadata,
+    media,
+    fields: "id, webViewLink",
+  });
 
-    // Hacer público el archivo
-    await drive.permissions.create({
-      fileId: file.data.id,
-      requestBody: {
-        role: "reader",
-        type: "anyone",
-      },
-    });
+  // Hacerlo público
+  await drive.permissions.create({
+    fileId: file.data.id,
+    requestBody: {
+      role: "reader",
+      type: "anyone",
+    },
+  });
 
-    return file.data;
-  } catch (error) {
-    console.error("Error al subir el archivo a Google Drive", error);
-    throw error;
-  }
+  return file.data;
 };
 
-// Ruta para manejar la subida de archivos PDF
+// Ruta para recibir formulario + PDF
 app.post("/upload", upload.single("pdf"), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: "No se ha subido ningún archivo" });
-    }
+    if (!req.file) return res.status(400).json({ success: false, message: "No se ha subido ningún archivo" });
 
     const filePath = path.join(__dirname, req.file.path);
     const fileName = req.file.originalname;
 
     const fileData = await uploadFileToDrive(filePath, fileName);
+    fs.unlinkSync(filePath); // Eliminar archivo local
 
-    // Eliminar archivo temporal después de subirlo
-    fs.unlinkSync(filePath);
+    // Guardar datos del formulario en Firebase
+    const nuevoRegistro = {
+      folio: req.body.folio || "",
+      asunto: req.body.asunto || "",
+      fechaRecibo: req.body.fechaRecibo || "",
+      contenido: req.body.contenido || "",
+      persona: req.body.persona || "",
+      enlacePDF: fileData.webViewLink,
+      estatus: "Pendiente",           // ✅ Estado inicial
+      comentarios: "",                // ✅ Comentarios opcionales
+      motivoRechazo: "",             // ✅ Se llenará si se rechaza
+      timestamp: new Date()
+    };
+
+    await db.collection("oficios").add(nuevoRegistro);
 
     res.json({
       success: true,
-      message: "Archivo subido correctamente",
+      message: "Archivo subido y datos registrados correctamente",
       fileId: fileData.id,
-      fileLink: fileData.webViewLink,
+      fileLink: fileData.webViewLink
     });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: "Error al subir el archivo" });
+    console.error("Error en /upload:", error);
+    res.status(500).json({ success: false, message: "Error al subir archivo o guardar datos" });
   }
 });
 
-// Ruta raíz, para verificar que el servidor está funcionando
+// Verificación
 app.get("/", (req, res) => {
-  res.send("Servidor de Backend en funcionamiento");
+  res.send("Servidor Backend funcionando correctamente");
 });
 
 // Iniciar servidor
 app.listen(port, () => {
-  console.log(`Servidor ejecutándose en http://localhost:${port}`);
+  console.log(`Servidor corriendo en http://localhost:${port}`);
 });

@@ -1,73 +1,104 @@
 import React, { useEffect, useState } from 'react';
-import { getDatabase, ref, onValue } from 'firebase/database';
-import { initializeApp } from 'firebase/app';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAheth-iCGenbU3n68q5PXADt8posrlyug",
-  authDomain: "gestion-oficios-pc.firebaseapp.com",
-  databaseURL: "https://gestion-oficios-pc-default-rtdb.firebaseio.com",
-  projectId: "gestion-oficios-pc",
-  storageBucket: "gestion-oficios-pc.firebasestorage.app",
-  messagingSenderId: "1012485780559",
-  appId: "1:1012485780559:web:fd0e985b31fd2900fea63a"
-};
-
-// Inicializa Firebase solo una vez
-const app = initializeApp(firebaseConfig);
-const database = getDatabase(app);
-
-const OficiosPanel = () => {
+function OficiosPanel() {
   const [oficios, setOficios] = useState([]);
 
   useEffect(() => {
-    const oficiosRef = ref(database, 'oficios');
-    onValue(oficiosRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const lista = Object.entries(data).map(([folio, contenido]) => ({
-          folio,
-          ...contenido,
+    const obtenerOficios = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'oficios'));
+        const lista = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data()
         }));
         setOficios(lista);
-      } else {
-        setOficios([]);
+      } catch (error) {
+        console.error("Error al obtener oficios:", error);
       }
-    });
+    };
+
+    obtenerOficios();
   }, []);
 
+  const handleChange = (id, campo, valor) => {
+    setOficios((prev) =>
+      prev.map((oficio) =>
+        oficio.id === id ? { ...oficio, [campo]: valor } : oficio
+      )
+    );
+  };
+
+  const handleGuardar = async (id, oficio) => {
+    try {
+      const oficioRef = doc(db, 'oficios', id);
+      await updateDoc(oficioRef, {
+        estatus: oficio.estatus,
+        comentarios: oficio.comentarios || '',
+        motivoRechazo: oficio.motivoRechazo || ''
+      });
+      alert("Actualizado correctamente");
+    } catch (error) {
+      console.error("Error al actualizar:", error);
+    }
+  };
+
   return (
-    <div style={{ padding: '2rem' }}>
-      <h2>📋 Panel de Oficios</h2>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th>Folio</th>
-            <th>Asunto</th>
-            <th>Persona</th>
-            <th>Fecha Recibo</th>
-            <th>Estatus</th>
-            <th>Comentarios</th>
-            <th>PDF</th>
-          </tr>
-        </thead>
-        <tbody>
-          {oficios.map((oficio) => (
-            <tr key={oficio.folio}>
-              <td>{oficio.folio}</td>
-              <td>{oficio.asunto}</td>
-              <td>{oficio.persona}</td>
-              <td>{oficio.fechaRecibo}</td>
-              <td>{oficio.estatus}</td>
-              <td>{oficio.comentarios}</td>
-              <td>
-                <a href={oficio.pdfUrl} target="_blank" rel="noopener noreferrer">📄 Ver PDF</a>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      <h2>Panel de Control de Oficios</h2>
+      {oficios.map((oficio) => (
+        <div key={oficio.id} className="oficio-card">
+          <h3>{oficio.folio} - {oficio.asunto}</h3>
+          <p>Persona: {oficio.persona}</p>
+          <p>Contenido: {oficio.contenido}</p>
+
+          {/* Estatus */}
+          <label>Estatus: </label>
+          <select
+            value={oficio.estatus}
+            onChange={(e) => handleChange(oficio.id, "estatus", e.target.value)}
+          >
+            <option value="Pendiente">Pendiente</option>
+            <option value="Aceptado">Aceptado</option>
+            <option value="Rechazado">Rechazado</option>
+          </select>
+
+          {/* Motivo Rechazo */}
+          {oficio.estatus === "Rechazado" && (
+            <>
+              <label>Motivo de Rechazo:</label>
+              <select
+                value={oficio.motivoRechazo || ""}
+                onChange={(e) =>
+                  handleChange(oficio.id, "motivoRechazo", e.target.value)
+                }
+              >
+                <option value="">Selecciona un motivo</option>
+                <option value="Información incompleta">Información incompleta</option>
+                <option value="Fuera de competencia">Fuera de competencia</option>
+                <option value="No aplica">No aplica</option>
+              </select>
+            </>
+          )}
+
+          {/* Comentarios */}
+          <label>Comentarios:</label>
+          <textarea
+            rows={2}
+            value={oficio.comentarios || ""}
+            onChange={(e) =>
+              handleChange(oficio.id, "comentarios", e.target.value)
+            }
+          />
+
+          <button onClick={() => handleGuardar(oficio.id, oficio)}>Guardar Cambios</button>
+          <hr />
+        </div>
+      ))}
     </div>
   );
-};
+}
 
 export default OficiosPanel;
+
