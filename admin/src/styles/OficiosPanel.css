@@ -1,0 +1,55 @@
+.volver-button {
+  margin-bottom: 20px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  background-color: #f2f2f2;
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.volver-button:hover {
+  background-color: #ddd;
+}
+
+.btns-container {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.left-buttons button,
+.right-buttons button {
+  font-size: 0.75rem;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+}
+
+/* Botón azul para guardar */
+.save-button {
+  background-color: #007bff;
+  color: #fff;
+}
+.save-button:hover {
+  background-color: #0056b3;
+}
+
+/* Botón gris para editar */
+.edit-button {
+  background-color: #6c757d;
+  color: #fff;
+}
+.edit-button:hover {
+  background-color: #5a6268;
+}
+
+/* Botón rojo para eliminar */
+.delete-button {
+  background-color: #dc3545;
+  color: #fff;
+}
+.delete-button:hover {
+  background-color: #a71d2a;
+}
