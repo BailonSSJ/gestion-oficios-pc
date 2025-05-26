@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen, faFloppyDisk, faTrash, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { faPen, faFloppyDisk, faTrash, faArrowLeft, faSearch } from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 import '../styles/OficiosPanel.css';
 
@@ -10,18 +10,20 @@ const OficiosPanel = () => {
   const [oficios, setOficios] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
   const [oficioEditado, setOficioEditado] = useState({});
+  const [busqueda, setBusqueda] = useState('');
+  const [resultadoBusqueda, setResultadoBusqueda] = useState(null);
+  const [filtroEstatus, setFiltroEstatus] = useState('Todos');
   const navigate = useNavigate();
 
   useEffect(() => {
     const obtenerOficios = async () => {
       const snapshot = await getDocs(collection(db, 'oficios'));
       const oficiosData = snapshot.docs.map(doc => ({
-        id: doc.id,           // ID generado por Firestore (no modificar)
-        ...doc.data()         // Aquí debe existir un campo 'folio'
+        id: doc.id,
+        ...doc.data()
       }));
       setOficios(oficiosData);
     };
-
     obtenerOficios();
   }, []);
 
@@ -31,9 +33,13 @@ const OficiosPanel = () => {
   };
 
   const handleGuardar = async () => {
+    if (oficioEditado.estatus === 'Rechazado' && !oficioEditado.motivoRechazo) {
+      alert('Debes seleccionar un motivo de rechazo.');
+      return;
+    }
+
     try {
       const oficioRef = doc(db, 'oficios', editandoId);
-      // Guardamos la info editada, incluyendo folio pero NO modificamos el ID
       await updateDoc(oficioRef, {
         folio: oficioEditado.folio,
         persona: oficioEditado.persona,
@@ -41,16 +47,17 @@ const OficiosPanel = () => {
         contenido: oficioEditado.contenido,
         comentarios: oficioEditado.comentarios,
         estatus: oficioEditado.estatus,
-        motivoRechazo: oficioEditado.motivoRechazo || null,
+        motivoRechazo: oficioEditado.estatus === 'Rechazado' ? oficioEditado.motivoRechazo || '' : null,
         fechaRecibo: oficioEditado.fechaRecibo || null,
+        timestamp: serverTimestamp(),
       });
 
-      setOficios((prevOficios) =>
-        prevOficios.map((item) =>
-          item.id === editandoId ? { ...item, ...oficioEditado } : item
+      setOficios(prev =>
+        prev.map(of => of.id === editandoId
+          ? { ...of, ...oficioEditado, timestamp: new Date() }
+          : of
         )
       );
-
       setEditandoId(null);
       setOficioEditado({});
     } catch (error) {
@@ -64,35 +71,97 @@ const OficiosPanel = () => {
 
     try {
       await deleteDoc(doc(db, 'oficios', id));
-      setOficios((prevOficios) => prevOficios.filter((item) => item.id !== id));
+      setOficios(prev => prev.filter(of => of.id !== id));
     } catch (error) {
       console.error('Error al eliminar el oficio:', error);
     }
   };
 
   const handleCambioCampo = (campo, valor) => {
-    setOficioEditado((prev) => ({ ...prev, [campo]: valor }));
+    setOficioEditado(prev => {
+      if (campo === 'estatus' && valor !== 'Rechazado') {
+        return { ...prev, [campo]: valor, motivoRechazo: '' };
+      }
+      return { ...prev, [campo]: valor };
+    });
   };
 
   const formatearFecha = (fechaStr) => {
     if (!fechaStr) return 'Sin fecha';
-    const fecha = new Date(fechaStr);
+    let fecha;
+
+    if (typeof fechaStr === 'object' && fechaStr.seconds) {
+      fecha = new Date(fechaStr.seconds * 1000);
+    } else {
+      fecha = new Date(fechaStr);
+    }
+
+    if (isNaN(fecha.getTime())) return 'Fecha inválida';
+
     return fecha.toLocaleDateString('es-MX', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
     });
   };
 
+  const buscarPorFolio = () => {
+    const encontrado = oficios.find(of => of.folio?.toLowerCase() === busqueda.toLowerCase());
+    setResultadoBusqueda(encontrado || null);
+  };
+
+  const listaFiltrada = resultadoBusqueda
+    ? [resultadoBusqueda]
+    : filtroEstatus === 'Todos'
+      ? oficios
+      : oficios.filter(of => of.estatus === filtroEstatus);
+
   return (
-    <div>
+    <div className="contenedor-principal">
       <button className="volver-button" onClick={() => navigate('/')}>
         <FontAwesomeIcon icon={faArrowLeft} /> Volver a Registro
       </button>
 
       <h2>Panel de Oficios</h2>
-      {oficios.map((oficio) => (
+
+      <div className="busqueda-container">
+        <input
+          type="text"
+          placeholder="Buscar por folio..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+        <button onClick={buscarPorFolio} className="buscar-button">
+          <FontAwesomeIcon icon={faSearch} /> Buscar
+        </button>
+
+        <select
+          value={filtroEstatus}
+          onChange={(e) => setFiltroEstatus(e.target.value)}
+          className="filtro-select"
+        >
+          <option value="Todos">Todos</option>
+          <option value="Pendiente">Pendiente</option>
+          <option value="Aceptado">Aceptado</option>
+          <option value="Rechazado">Rechazado</option>
+        </select>
+      </div>
+
+      {listaFiltrada.map((oficio) => (
         <div key={oficio.id} className="oficio-panel">
+          {oficio.enlacePDF && (
+            <a
+              className="ver-pdf-button"
+              href={oficio.enlacePDF}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Ver PDF
+            </a>
+          )}
 
           <label>Folio:</label>
           {editandoId === oficio.id ? (
@@ -108,6 +177,11 @@ const OficiosPanel = () => {
           <label>Fecha de Recibo:</label>
           <div className="field-text">
             {oficio.fechaRecibo ? formatearFecha(oficio.fechaRecibo) : 'Sin fecha'}
+          </div>
+
+          <label>Fecha de última actualización:</label>
+          <div className="field-text">
+            {oficio.timestamp ? formatearFecha(oficio.timestamp) : 'No disponible'}
           </div>
 
           <label>Persona que recibe:</label>
@@ -132,7 +206,7 @@ const OficiosPanel = () => {
             <div className="field-text">{oficio.asunto || 'Sin asunto'}</div>
           )}
 
-          <label>Contenido:</label>
+          <label>Contenido (Pendiente a atender):</label>
           {editandoId === oficio.id ? (
             <textarea
               rows="3"
@@ -154,65 +228,65 @@ const OficiosPanel = () => {
             <div className="field-text">{oficio.comentarios || 'Sin comentarios'}</div>
           )}
 
-          <label>Estatus:</label>
           {editandoId === oficio.id ? (
-            <select
-              value={oficioEditado.estatus || 'Pendiente'}
-              onChange={(e) => handleCambioCampo('estatus', e.target.value)}
-            >
-              <option value="Pendiente">Pendiente</option>
-              <option value="Aceptado">Aceptado</option>
-              <option value="Rechazado">Rechazado</option>
-            </select>
-          ) : (
-            <div className="field-text">{oficio.estatus || 'Pendiente'}</div>
-          )}
-
-          {editandoId === oficio.id && oficioEditado.estatus === 'Rechazado' && (
             <>
-              <label>Motivo de Rechazo:</label>
+              <label>Estatus:</label>
               <select
-                value={oficioEditado.motivoRechazo || ''}
-                onChange={(e) => handleCambioCampo('motivoRechazo', e.target.value)}
+                value={oficioEditado.estatus || 'Pendiente'}
+                onChange={(e) => handleCambioCampo('estatus', e.target.value)}
               >
-                <option value="">Seleccione un motivo</option>
-                <option value="Fuera de competencia">Fuera de competencia</option>
-                <option value="No cumple requisitos">No cumple requisitos</option>
-                <option value="Mal proceso">Mal proceso</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Aceptado">Aceptado</option>
+                <option value="Rechazado">Rechazado</option>
               </select>
-            </>
-          )}
 
-          {editandoId !== oficio.id && oficio.estatus === 'Rechazado' && (
+              {oficioEditado.estatus === 'Rechazado' && (
+                <>
+                  <label>Motivo de Rechazo:</label>
+                  <select
+                    value={oficioEditado.motivoRechazo || ''}
+                    onChange={(e) => handleCambioCampo('motivoRechazo', e.target.value)}
+                  >
+                    <option value="">Seleccionar motivo</option>
+                    <option value="Fuera de competencia">Fuera de competencia</option>
+                    <option value="No cumplir requisitos">No cumplir requisitos</option>
+                    <option value="Mal proceso">Mal proceso</option>
+                  </select>
+                </>
+              )}
+            </>
+          ) : (
             <>
-              <label>Motivo de Rechazo:</label>
-              <div className="field-text">
-                {oficio.motivoRechazo || 'No especificado'}
+              <label>Estatus:</label>
+              <div className={`estatus estatus-${oficio.estatus?.toLowerCase()}`}>
+                {oficio.estatus}
               </div>
+
+              {oficio.estatus === 'Rechazado' && (
+                <>
+                  <label>Motivo de Rechazo:</label>
+                  <div className="field-text">{oficio.motivoRechazo || 'No especificado'}</div>
+                </>
+              )}
             </>
           )}
 
-          <div className="btns-container">
-            {editandoId === oficio.id ? (
-              <>
-                <button className="save-button" onClick={handleGuardar}>
-                  <FontAwesomeIcon icon={faFloppyDisk} /> Guardar
-                </button>
-                <button className="delete-button" onClick={() => handleEliminar(oficio.id)}>
-                  <FontAwesomeIcon icon={faTrash} /> Eliminar
-                </button>
-              </>
-            ) : (
-              <>
-                <button className="edit-button" onClick={() => handleEditar(oficio)}>
-                  <FontAwesomeIcon icon={faPen} /> Editar
-                </button>
-                <button className="delete-button" onClick={() => handleEliminar(oficio.id)}>
-                  <FontAwesomeIcon icon={faTrash} /> Eliminar
-                </button>
-              </>
-            )}
-          </div>
+          {editandoId === oficio.id ? (
+            <div className="btns-container">
+              <button className="save-button" onClick={handleGuardar}>
+                <FontAwesomeIcon icon={faFloppyDisk} /> Guardar
+              </button>
+            </div>
+          ) : (
+            <div className="btns-container">
+              <button className="edit-button" onClick={() => handleEditar(oficio)}>
+                <FontAwesomeIcon icon={faPen} /> Editar
+              </button>
+              <button className="delete-button" onClick={() => handleEliminar(oficio.id)}>
+                <FontAwesomeIcon icon={faTrash} /> Eliminar
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>

@@ -14,42 +14,160 @@
 
 .btns-container {
   display: flex;
-  justify-content: space-between;
+  gap: 10px;
+  justify-content: flex-start;
   margin-top: 10px;
 }
 
-.left-buttons button,
-.right-buttons button {
+.save-button,
+.edit-button,
+.delete-button {
   font-size: 0.75rem;
   padding: 6px 12px;
-  border-radius: 12px;
+  border-radius: 6px;
   border: none;
   cursor: pointer;
+  flex-shrink: 0;
+  width: auto;
 }
 
-/* Botón azul para guardar */
 .save-button {
   background-color: #007bff;
-  color: #fff;
+  color: white;
 }
 .save-button:hover {
   background-color: #0056b3;
 }
 
-/* Botón gris para editar */
 .edit-button {
   background-color: #6c757d;
-  color: #fff;
+  color: white;
 }
 .edit-button:hover {
   background-color: #5a6268;
 }
 
-/* Botón rojo para eliminar */
 .delete-button {
   background-color: #dc3545;
-  color: #fff;
+  color: white;
 }
 .delete-button:hover {
   background-color: #a71d2a;
+}
+
+.estatus-pendiente {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 5px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.estatus-aceptado {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 5px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.estatus-rechazado {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 5px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.busqueda-container {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.busqueda-container input {
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+.busqueda-container button {
+  padding: 6px 10px;
+  background-color: #343a40;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.busqueda-container button:hover {
+  background-color: #23272b;
+}
+.filtro-select {
+  margin-left: 10px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 0.85rem;
+}
+
+/* Nuevos estilos estéticos */
+.oficio-panel {
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background-color: #fafafa;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+.oficio-panel label {
+  display: block;
+  font-weight: bold;
+  margin-top: 10px;
+}
+.oficio-panel input[type="text"],
+.oficio-panel textarea,
+.oficio-panel select {
+  width: 100%;
+  padding: 6px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+.field-text {
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: #fff;
+  margin-bottom: 8px;
+}
+.contenedor-principal {
+  padding: 0 20px; /* margen lateral */
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ver-pdf-button {
+  background-color: purple;
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  text-decoration: none;
+}
+
+.ver-pdf-button:hover {
+  background-color: #5d2b8a;
+}
+
+.oficio-panel {
+  position: relative;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
 }
