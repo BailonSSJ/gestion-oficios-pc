@@ -1,4 +1,3 @@
-// Importaciones necesarias (formato ESM)
 import express from "express";
 import { google } from "googleapis";
 import path from "path";
@@ -6,48 +5,40 @@ import fs from "fs";
 import cors from "cors";
 import multer from "multer";
 import { fileURLToPath } from "url";
-import admin from "firebase-admin"; // 👈 Firebase Admin SDK
+import admin from "firebase-admin";
 
-// Compatibilidad para __dirname en ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Inicializar Express
 const app = express();
 const port = 5000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // ✅ importante para recibir formularios con archivos
 
-// Configurar Multer
 const upload = multer({ dest: "uploads/" });
 
-// Cargar credenciales de Google Drive
 const keyFile = JSON.parse(fs.readFileSync(path.join(__dirname, "gestion.json"), "utf-8"));
-
-// Autenticación Google Drive
 const auth = new google.auth.GoogleAuth({
   credentials: keyFile,
   scopes: ["https://www.googleapis.com/auth/drive.file"]
 });
 const drive = google.drive({ version: "v3", auth });
 
-// Inicializar Firebase Admin
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, "firebase-service-account.json"), "utf-8"));
 admin.initializeApp({
   credential: admin.credential.cert(firebaseConfig)
 });
 const db = admin.firestore();
 
-// Subida a Google Drive
-const uploadFileToDrive = async (filePath, fileName) => {
+const uploadFileToDrive = async (filePath, fileName, mimeType) => {
   const fileMetadata = {
     name: fileName,
-    parents: ["1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl"], // carpeta en tu Drive
+    parents: ["1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl"],
   };
   const media = {
-    mimeType: "application/pdf",
+    mimeType: mimeType,
     body: fs.createReadStream(filePath),
   };
 
@@ -57,7 +48,6 @@ const uploadFileToDrive = async (filePath, fileName) => {
     fields: "id, webViewLink",
   });
 
-  // Hacerlo público
   await drive.permissions.create({
     fileId: file.data.id,
     requestBody: {
@@ -69,18 +59,17 @@ const uploadFileToDrive = async (filePath, fileName) => {
   return file.data;
 };
 
-// Ruta para recibir formulario + PDF
-app.post("/upload", upload.single("pdf"), async (req, res) => {
+app.post("/upload", upload.single("archivo"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: "No se ha subido ningún archivo" });
 
     const filePath = path.join(__dirname, req.file.path);
     const fileName = req.file.originalname;
+    const mimeType = req.file.mimetype;
 
-    const fileData = await uploadFileToDrive(filePath, fileName);
+    const fileData = await uploadFileToDrive(filePath, fileName, mimeType);
     fs.unlinkSync(filePath); // Eliminar archivo local
 
-    // Guardar datos del formulario en Firebase
     const nuevoRegistro = {
       folio: req.body.folio || "",
       asunto: req.body.asunto || "",
@@ -88,9 +77,9 @@ app.post("/upload", upload.single("pdf"), async (req, res) => {
       contenido: req.body.contenido || "",
       persona: req.body.persona || "",
       enlacePDF: fileData.webViewLink,
-      estatus: "Pendiente",           // ✅ Estado inicial
-      comentarios: "",                // ✅ Comentarios opcionales
-      motivoRechazo: "",             // ✅ Se llenará si se rechaza
+      estatus: "Pendiente",
+      comentarios: "",
+      motivoRechazo: "",
       timestamp: new Date()
     };
 
@@ -109,12 +98,10 @@ app.post("/upload", upload.single("pdf"), async (req, res) => {
   }
 });
 
-// Verificación
 app.get("/", (req, res) => {
   res.send("Servidor Backend funcionando correctamente");
 });
 
-// Iniciar servidor
 app.listen(port, () => {
   console.log(`Servidor corriendo en http://localhost:${port}`);
 });

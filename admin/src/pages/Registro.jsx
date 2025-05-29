@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom'; // 👈 Importamos useNavigate
+import { useNavigate } from 'react-router-dom';
 import '../styles/Registro.css';
 
 const Registro = () => {
@@ -9,25 +9,25 @@ const Registro = () => {
   const [fechaRecibo, setFechaRecibo] = useState('');
   const [contenido, setContenido] = useState('');
   const [persona, setPersona] = useState('');
-  const [pdf, setPdf] = useState(null);
+  const [archivo, setArchivo] = useState(null);
   const [mensaje, setMensaje] = useState('');
 
-  const navigate = useNavigate(); // 👈 Hook para navegación
+  const navigate = useNavigate();
 
   const handleFileChange = (e) => {
-    setPdf(e.target.files[0]);
+    setArchivo(e.target.files[0]);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!pdf) {
-      setMensaje("Por favor, selecciona un archivo PDF.");
+
+    if (!archivo) {
+      setMensaje("Por favor, selecciona un archivo PDF o una imagen.");
       return;
     }
 
     const formData = new FormData();
-    formData.append('pdf', pdf);
+    formData.append('archivo', archivo);
     formData.append('folio', folio);
     formData.append('asunto', asunto);
     formData.append('fechaRecibo', fechaRecibo);
@@ -45,13 +45,13 @@ const Registro = () => {
         setMensaje("Error: " + response.data.message);
       }
 
-      // Limpiar los campos después de enviar
+      // Limpiar campos
       setFolio('');
       setAsunto('');
       setFechaRecibo('');
       setContenido('');
       setPersona('');
-      setPdf(null);
+      setArchivo(null);
     } catch (error) {
       setMensaje("Error al subir el archivo.");
       console.error(error);
@@ -83,16 +83,14 @@ const Registro = () => {
           <input type="text" value={persona} onChange={(e) => setPersona(e.target.value)} required />
         </div>
         <div>
-          <label>Oficio (PDF):</label>
-          <input type="file" accept=".pdf" onChange={handleFileChange} required />
+          <label>Oficio (PDF o imagen):</label>
+          <input type="file" accept=".pdf,image/*" onChange={handleFileChange} required />
         </div>
         <button type="submit">Enviar</button>
       </form>
 
-      {/* Mostramos el mensaje si existe */}
       {mensaje && <p className="mensaje">{mensaje}</p>}
 
-      {/* 🔘 Botón para ir al panel */}
       <button onClick={() => navigate('/panel')} style={{ marginTop: '1rem' }}>
         Ir al Panel de Oficios
       </button>

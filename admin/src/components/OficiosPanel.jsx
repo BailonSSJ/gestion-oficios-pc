@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  limit,
+  updateDoc,
+  doc,
+  deleteDoc,
+  serverTimestamp
+} from 'firebase/firestore';
 import { db } from '../firebase';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen, faFloppyDisk, faTrash, faArrowLeft, faSearch } from '@fortawesome/free-solid-svg-icons';
+import {
+  faPen,
+  faFloppyDisk,
+  faTrash,
+  faArrowLeft,
+  faSearch
+} from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 import '../styles/OficiosPanel.css';
 
@@ -12,20 +28,34 @@ const OficiosPanel = () => {
   const [oficioEditado, setOficioEditado] = useState({});
   const [busqueda, setBusqueda] = useState('');
   const [resultadoBusqueda, setResultadoBusqueda] = useState(null);
-  const [filtroEstatus, setFiltroEstatus] = useState('Todos');
+  const [filtroEstatus, setFiltroEstatus] = useState('Últimos 5');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const obtenerOficios = async () => {
-      const snapshot = await getDocs(collection(db, 'oficios'));
-      const oficiosData = snapshot.docs.map(doc => ({
+  const obtenerOficios = async (filtro = 'Últimos 5') => {
+    try {
+      let q;
+
+      if (filtro === 'Últimos 5') {
+        q = query(collection(db, 'oficios'), orderBy('timestamp', 'desc'), limit(5));
+      } else {
+        q = query(collection(db, 'oficios'), orderBy('timestamp', 'desc'));
+      }
+
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      setOficios(oficiosData);
-    };
-    obtenerOficios();
-  }, []);
+
+      setOficios(data);
+    } catch (error) {
+      console.error('Error al obtener oficios:', error);
+    }
+  };
+
+  useEffect(() => {
+    obtenerOficios(filtroEstatus);
+  }, [filtroEstatus]);
 
   const handleEditar = (oficio) => {
     setEditandoId(oficio.id);
@@ -41,25 +71,14 @@ const OficiosPanel = () => {
     try {
       const oficioRef = doc(db, 'oficios', editandoId);
       await updateDoc(oficioRef, {
-        folio: oficioEditado.folio,
-        persona: oficioEditado.persona,
-        asunto: oficioEditado.asunto,
-        contenido: oficioEditado.contenido,
-        comentarios: oficioEditado.comentarios,
-        estatus: oficioEditado.estatus,
+        ...oficioEditado,
         motivoRechazo: oficioEditado.estatus === 'Rechazado' ? oficioEditado.motivoRechazo || '' : null,
-        fechaRecibo: oficioEditado.fechaRecibo || null,
         timestamp: serverTimestamp(),
       });
 
-      setOficios(prev =>
-        prev.map(of => of.id === editandoId
-          ? { ...of, ...oficioEditado, timestamp: new Date() }
-          : of
-        )
-      );
       setEditandoId(null);
       setOficioEditado({});
+      obtenerOficios(filtroEstatus);
     } catch (error) {
       console.error('Error al guardar los cambios:', error);
     }
@@ -116,8 +135,10 @@ const OficiosPanel = () => {
   const listaFiltrada = resultadoBusqueda
     ? [resultadoBusqueda]
     : filtroEstatus === 'Todos'
-      ? oficios
-      : oficios.filter(of => of.estatus === filtroEstatus);
+    ? oficios
+    : filtroEstatus === 'Últimos 5'
+    ? oficios
+    : oficios.filter(of => of.estatus === filtroEstatus);
 
   return (
     <div className="contenedor-principal">
@@ -143,6 +164,7 @@ const OficiosPanel = () => {
           onChange={(e) => setFiltroEstatus(e.target.value)}
           className="filtro-select"
         >
+          <option value="Últimos 5">Últimos 5</option>
           <option value="Todos">Todos</option>
           <option value="Pendiente">Pendiente</option>
           <option value="Aceptado">Aceptado</option>
