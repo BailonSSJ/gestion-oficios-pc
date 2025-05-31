@@ -29,6 +29,7 @@ const OficiosPanel = () => {
   const [busqueda, setBusqueda] = useState('');
   const [resultadoBusqueda, setResultadoBusqueda] = useState(null);
   const [filtroEstatus, setFiltroEstatus] = useState('Últimos 5');
+  const [errorBusqueda, setErrorBusqueda] = useState('');
   const navigate = useNavigate();
 
   const obtenerOficios = async (filtro = 'Últimos 5') => {
@@ -55,6 +56,8 @@ const OficiosPanel = () => {
 
   useEffect(() => {
     obtenerOficios(filtroEstatus);
+    setResultadoBusqueda(null);
+    setErrorBusqueda('');
   }, [filtroEstatus]);
 
   const handleEditar = (oficio) => {
@@ -128,8 +131,20 @@ const OficiosPanel = () => {
   };
 
   const buscarPorFolio = () => {
+    if (!busqueda.trim()) {
+      setResultadoBusqueda(null);
+      setErrorBusqueda('');
+      return;
+    }
+
     const encontrado = oficios.find(of => of.folio?.toLowerCase() === busqueda.toLowerCase());
-    setResultadoBusqueda(encontrado || null);
+    if (encontrado) {
+      setResultadoBusqueda(encontrado);
+      setErrorBusqueda('');
+    } else {
+      setResultadoBusqueda(null);
+      setErrorBusqueda('Folio no encontrado');
+    }
   };
 
   const listaFiltrada = resultadoBusqueda
@@ -138,7 +153,20 @@ const OficiosPanel = () => {
     ? oficios
     : filtroEstatus === 'Últimos 5'
     ? oficios
-    : oficios.filter(of => of.estatus === filtroEstatus);
+    : oficios.filter(of => {
+        const estatus = of.estatus;
+        return (
+          estatus === filtroEstatus ||
+          (filtroEstatus === 'En Proceso' && estatus === 'Pendiente') ||
+          (filtroEstatus === 'Autorizado' && estatus === 'Aceptado')
+        );
+      });
+
+  const mostrarEstatus = (estatus) => {
+    if (estatus === 'Pendiente') return 'En Proceso';
+    if (estatus === 'Aceptado') return 'Autorizado';
+    return estatus;
+  };
 
   return (
     <div className="contenedor-principal">
@@ -154,6 +182,7 @@ const OficiosPanel = () => {
           placeholder="Buscar por folio..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') buscarPorFolio(); }}
         />
         <button onClick={buscarPorFolio} className="buscar-button">
           <FontAwesomeIcon icon={faSearch} /> Buscar
@@ -166,11 +195,17 @@ const OficiosPanel = () => {
         >
           <option value="Últimos 5">Últimos 5</option>
           <option value="Todos">Todos</option>
-          <option value="Pendiente">Pendiente</option>
-          <option value="Aceptado">Aceptado</option>
+          <option value="En Proceso">En Proceso</option>
+          <option value="Autorizado">Autorizado</option>
           <option value="Rechazado">Rechazado</option>
         </select>
       </div>
+
+      {errorBusqueda && (
+        <div className="error-busqueda" style={{ color: 'red', marginBottom: '10px' }}>
+          {errorBusqueda}
+        </div>
+      )}
 
       {listaFiltrada.map((oficio) => (
         <div key={oficio.id} className="oficio-panel">
@@ -257,8 +292,8 @@ const OficiosPanel = () => {
                 value={oficioEditado.estatus || 'Pendiente'}
                 onChange={(e) => handleCambioCampo('estatus', e.target.value)}
               >
-                <option value="Pendiente">Pendiente</option>
-                <option value="Aceptado">Aceptado</option>
+                <option value="Pendiente">En Proceso</option>
+                <option value="Aceptado">Autorizado</option>
                 <option value="Rechazado">Rechazado</option>
               </select>
 
@@ -281,30 +316,28 @@ const OficiosPanel = () => {
             <>
               <label>Estatus:</label>
               <div className={`estatus estatus-${oficio.estatus?.toLowerCase()}`}>
-                {oficio.estatus}
+                {mostrarEstatus(oficio.estatus)}
               </div>
 
               {oficio.estatus === 'Rechazado' && (
                 <>
                   <label>Motivo de Rechazo:</label>
-                  <div className="field-text">{oficio.motivoRechazo || 'No especificado'}</div>
+                  <div className="field-text">{oficio.motivoRechazo || 'Sin motivo'}</div>
                 </>
               )}
             </>
           )}
 
           {editandoId === oficio.id ? (
-            <div className="btns-container">
-              <button className="save-button" onClick={handleGuardar}>
-                <FontAwesomeIcon icon={faFloppyDisk} /> Guardar
-              </button>
-            </div>
+            <button onClick={handleGuardar} className="save-button">
+              <FontAwesomeIcon icon={faFloppyDisk} /> Guardar
+            </button>
           ) : (
-            <div className="btns-container">
-              <button className="edit-button" onClick={() => handleEditar(oficio)}>
+            <div className="acciones">
+              <button onClick={() => handleEditar(oficio)} className="edit-button">
                 <FontAwesomeIcon icon={faPen} /> Editar
               </button>
-              <button className="delete-button" onClick={() => handleEliminar(oficio.id)}>
+              <button onClick={() => handleEliminar(oficio.id)} className="delete-button">
                 <FontAwesomeIcon icon={faTrash} /> Eliminar
               </button>
             </div>

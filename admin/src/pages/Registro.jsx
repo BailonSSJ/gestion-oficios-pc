@@ -11,6 +11,7 @@ const Registro = () => {
   const [persona, setPersona] = useState('');
   const [archivo, setArchivo] = useState(null);
   const [mensaje, setMensaje] = useState('');
+  const [subiendo, setSubiendo] = useState(false);
 
   const navigate = useNavigate();
 
@@ -26,6 +27,8 @@ const Registro = () => {
       return;
     }
 
+    setSubiendo(true);
+
     const formData = new FormData();
     formData.append('archivo', archivo);
     formData.append('folio', folio);
@@ -35,7 +38,7 @@ const Registro = () => {
     formData.append('persona', persona);
 
     try {
-      const response = await axios.post('http://localhost:5000/upload', formData, {
+      const response = await axios.post('http://localhost:3001/subir', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
@@ -45,7 +48,6 @@ const Registro = () => {
         setMensaje("Error: " + response.data.message);
       }
 
-      // Limpiar campos
       setFolio('');
       setAsunto('');
       setFechaRecibo('');
@@ -55,6 +57,8 @@ const Registro = () => {
     } catch (error) {
       setMensaje("Error al subir el archivo.");
       console.error(error);
+    } finally {
+      setSubiendo(false);
     }
   };
 
@@ -89,6 +93,7 @@ const Registro = () => {
         <button type="submit">Enviar</button>
       </form>
 
+      {subiendo && <p className="mensaje">Subiendo...</p>}
       {mensaje && <p className="mensaje">{mensaje}</p>}
 
       <button onClick={() => navigate('/panel')} style={{ marginTop: '1rem' }}>

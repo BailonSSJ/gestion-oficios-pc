@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: backend-oficios
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        value: 1TjWIbuhZDtE4_Dry8mqQ3cFAcoD1iDcl
+      - key: SPREADSHEET_ID
+        value: 1yzAvGebLlYRQI2UV0ueSHo3H9kem7HETghq_eF6X7ts
+      - key: FIREBASE_CREDENTIALS_STRING
+        value: ''
+      - key:  GOOGLE_DRIVE_CREDENTIALS_STRING
+        value: ''
+
