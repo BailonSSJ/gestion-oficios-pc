@@ -38,7 +38,7 @@ const Registro = () => {
     formData.append('persona', persona);
 
     try {
-      const response = await axios.post('http://localhost:3001/subir', formData, {
+      const response = await axios.post('http://gestion-oficios-pc.onrender.com/subir', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
