@@ -216,7 +216,7 @@ const OficiosPanel = () => {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Ver PDF
+              Ver Oficio
             </a>
           )}
 
